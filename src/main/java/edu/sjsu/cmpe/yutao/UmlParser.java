@@ -6,13 +6,13 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.ReferenceType;
+import com.github.javaparser.ast.type.Type;
 import net.sourceforge.plantuml.SourceStringReader;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by yutao on 10/6/15.
@@ -22,8 +22,10 @@ public class UmlParser {
     private final String path;
     private final String filename;
     private HashMap<String, ClassOrInterfaceDeclaration> map;
+    private ClassOrInterfaceDeclaration currentCID = null;
     private StringBuilder relationSB = new StringBuilder();
-    private Map<String, String> relationMap = new HashMap<>();
+    private Map<String, UmlRelationship> relationshipMap = new HashMap<>();
+    private StringBuilder sb = new StringBuilder();
 
     public UmlParser(String path, String filename) {
 
@@ -51,14 +53,14 @@ public class UmlParser {
             }
         }
 
-        StringBuilder sb = new StringBuilder();
         sb.append("@startuml\n");
         for (Map.Entry<String, ClassOrInterfaceDeclaration> entry : map.entrySet()) {
-            String source = printClass(entry.getValue());
-            sb.append(source);
+            printClass(entry.getValue());
         }
+        printRelationShip();
         sb.append(relationSB.toString());
         sb.append("@enduml\n");
+        log(sb.toString());
         draw(sb.toString(), filename);
     }
 
@@ -75,53 +77,162 @@ public class UmlParser {
         return null;
     }
 
-    public String printClass(ClassOrInterfaceDeclaration cid) {
-        StringBuilder sb = new StringBuilder();
+    public void printClass(ClassOrInterfaceDeclaration cid) {
+        this.currentCID = cid;
         sb.append("class ").append(cid.getName()).append(" {\n");
-        List<Node> nodes = cid.getChildrenNodes();
-        for (Node n : nodes) {
-            if (n instanceof FieldDeclaration) {
-                sb.append(printField(cid, (FieldDeclaration) n));
-            } else if (n instanceof MethodDeclaration) {
-                sb.append(printMethod((MethodDeclaration) n));
+        List<Node> childrenNodes = cid.getChildrenNodes();
+        for (Node childNode : childrenNodes) {
+            if (childNode instanceof FieldDeclaration) {
+                printField((FieldDeclaration) childNode);
+            } else if (childNode instanceof MethodDeclaration) {
+                printMethod((MethodDeclaration) childNode);
             }
         }
         sb.append("}\n");
-        return sb.toString();
     }
 
-    public String printField(ClassOrInterfaceDeclaration cid, FieldDeclaration fd) {
-        StringBuilder sb = new StringBuilder();
+    public void printField(FieldDeclaration fd) {
         boolean isRelation = false;
-        for (VariableDeclarator vdor : fd.getVariables()) {
-            if (fd.getType() instanceof ReferenceType
-                    && ((ReferenceType) fd.getType()).getType() instanceof ClassOrInterfaceType) {
-                ClassOrInterfaceType type =
-                        (ClassOrInterfaceType)((ReferenceType)fd.getType()).getType();
-                if (map.containsKey(type.getName())) {
-                    isRelation = true;
+        Type type = fd.getType();
+        if (type instanceof ReferenceType) {
+            Type subType = ((ReferenceType) type).getType();
+            if (((ReferenceType) type).getArrayCount() > 0) {
+                // array. int[], B[], String[]
 
-                } else if (type.getName().equals("Collection")) {
-                    ClassOrInterfaceType subType =
-                             (ClassOrInterfaceType)((ReferenceType)type.getTypeArgs().get(0)).getType();
-                    if (map.containsKey(subType.getName())) {
-                        isRelation = true;
-                        relationSB.append(cid.getName())
-                                .append(" \"1\" -- \"*\" ")
-                                .append(subType.getName())
-                                .append("\n");
+                if (subType instanceof PrimitiveType) {
+                    // int[]
+                    printPrimitiveType(fd);
+
+                } else if (subType instanceof ClassOrInterfaceType){
+                    if (map.containsKey(((ClassOrInterfaceType) subType).getName())) {
+                        // B[],
+                        createRelationship((ClassOrInterfaceType) subType, "*");
+                    } else {
+                        // String[]
+                        printPrimitiveType(fd);
+
+                    }
+                }
+            } else {
+                // Collection<B>, B b, String s
+                if (subType instanceof ClassOrInterfaceType) {
+                    if (((ClassOrInterfaceType) subType).getTypeArgs() != null) {
+                        // Collection<B>, Collectio<String>
+                        Type typeArg = (((ClassOrInterfaceType) subType).getTypeArgs().get(0));
+                        if (typeArg instanceof ReferenceType) {
+                            Type subsubsubType = ((ReferenceType) typeArg).getType();
+                            if (subsubsubType instanceof ClassOrInterfaceType) {
+                                if (map.containsKey(((ClassOrInterfaceType) subsubsubType).getName())) {
+                                    // Collection<B>
+                                    createRelationship((ClassOrInterfaceType) subsubsubType, "*");
+                                } else {
+                                    // TODO:
+                                    // Collection<String>
+                                    printPrimitiveType(fd);
+                                }
+                            }
+                        }
+                    } else {
+                        if (map.containsKey(((ClassOrInterfaceType) subType).getName())) {
+                            // B b,
+                            createRelationship((ClassOrInterfaceType) subType, "1");
+                        } else {
+                            // String s
+                            printPrimitiveType(fd);
+                        }
                     }
                 }
             }
-            if (!isRelation) {
-                sb.append(getModifier(fd.getModifiers()));
-                sb.append(" ");
-                sb.append(vdor.getId().getName());
-                sb.append(" : ").append(fd.getType());
-                sb.append("\n");
+        } else {
+            // primitive type. int i
+            printPrimitiveType(fd);
+        }
+    }
+
+    private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
+        ClassOrInterfaceDeclaration relatedCID = map.get(subType.getName());
+        String relationKey = null;
+        if (currentCID.getName().compareTo(relatedCID.getName()) < 0) {
+            relationKey = currentCID.getName() + "_" + relatedCID.getName();
+        } else {
+            relationKey = relatedCID.getName() + "_" + currentCID.getName();
+        }
+        if (relationshipMap.containsKey(relationKey)) {
+            UmlRelationship r = relationshipMap.get(relationKey);
+            r.setMultiplicityA(multiplicity);
+        } else {
+            relationshipMap.put(relationKey, new UmlRelationship(currentCID,
+                    "0",
+                    relatedCID,
+                    multiplicity,
+                    UmlRelationShipType.AS));
+        }
+    }
+
+    private void printRelationShip() {
+        for (Map.Entry<String, UmlRelationship> entry : relationshipMap.entrySet()) {
+            UmlRelationship r = entry.getValue();
+            relationSB.append(r.getA().getName())
+                    .append(" \"")
+                    .append(r.getMultiplicityA())
+                    .append("\" ")
+                    .append(r.getType().getS())
+                    .append(" \"")
+                    .append(r.getMultiplicityB())
+                    .append("\" ")
+                    .append(r.getB().getName())
+                    .append("\n");
+        }
+    }
+
+    private void printPrimitiveType(FieldDeclaration fd) {
+        sb.append(getModifier(fd.getModifiers()));
+        sb.append(" ");
+        sb.append(fd.getVariables().get(0).getId().getName());
+        sb.append(" : ").append(fd.getType());
+        sb.append("\n");
+    }
+
+    private void parseFiled(FieldDeclaration fd) {
+        List<Node> childrenNodes = fd.getChildrenNodes();
+        for (Node childNode : childrenNodes) {
+            if (childNode instanceof ReferenceType) {
+                parseReferenceType((ReferenceType) childNode);
+            } else if (childNode instanceof VariableDeclarator) {
+                parseVariableDeclarator((VariableDeclarator) childNode);
+            } else if (childNode instanceof PrimitiveType) {
+                parsePrimitiveType((PrimitiveType) childNode);
             }
         }
-        return sb.toString();
+    }
+
+    private void parsePrimitiveType(PrimitiveType primitiveType) {
+        sb.append(getModifier(((FieldDeclaration)primitiveType.getParentNode()).getModifiers()));
+        sb.append(" ");
+        sb.append("");
+        sb.append(" : ").append("fd.getType()");
+        sb.append("\n");
+    }
+
+    private void parseReferenceType(ReferenceType referenceType) {
+
+    }
+
+    private void parseVariableDeclarator(VariableDeclarator variableDeclarator) {
+        List<Node> childrenNodes = variableDeclarator.getChildrenNodes();
+        for (Node childNode : childrenNodes) {
+            if (childNode instanceof VariableDeclaratorId) {
+                logln(((VariableDeclaratorId) childNode).getName());
+            }
+        }
+    }
+
+    private void log(String s) {
+        System.out.print(s);
+    }
+
+    private void logln(String s) {
+        System.out.println(s);
     }
 
     private boolean isRelation(FieldDeclaration fd) {
@@ -141,15 +252,7 @@ public class UmlParser {
         return false;
     }
 
-    public String t() {
-        StringBuilder sb = new StringBuilder();
-        return sb.toString();
-    }
-
-    public String printMethod(MethodDeclaration md) {
-        StringBuilder sb = new StringBuilder();
-
-        return sb.toString();
+    public void printMethod(MethodDeclaration md) {
     }
 
     public String getModifier(int mod) {
