@@ -5,9 +5,10 @@ package edu.sjsu.cmpe.yutao;
  */
 public enum UmlRelationShipType {
     EX("<|--"),
-    IM("--"),
+    IM("<|.."),
     AS("--"),
-    DEP("--");
+    DEP("<.."),
+    LOLI("()--");
 
     private String s;
     UmlRelationShipType(String s) {

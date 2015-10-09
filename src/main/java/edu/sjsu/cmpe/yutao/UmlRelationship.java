@@ -9,14 +9,14 @@ public class UmlRelationship {
     private ClassOrInterfaceDeclaration a;
     private String multiplicityA;
     private ClassOrInterfaceDeclaration b;
-    private String MultiplicityB;
+    private String multiplicityB;
     private UmlRelationShipType type;
 
     public UmlRelationship(ClassOrInterfaceDeclaration a, String multiplicityA, ClassOrInterfaceDeclaration b, String multiplicityB, UmlRelationShipType type) {
         this.a = a;
         this.multiplicityA = multiplicityA;
         this.b = b;
-        MultiplicityB = multiplicityB;
+        this.multiplicityB = multiplicityB;
         this.type = type;
     }
 
@@ -45,11 +45,11 @@ public class UmlRelationship {
     }
 
     public String getMultiplicityB() {
-        return MultiplicityB;
+        return multiplicityB;
     }
 
     public void setMultiplicityB(String multiplicityB) {
-        MultiplicityB = multiplicityB;
+        this.multiplicityB = multiplicityB;
     }
 
     public UmlRelationShipType getType() {

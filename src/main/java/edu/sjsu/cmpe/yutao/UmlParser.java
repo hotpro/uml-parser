@@ -12,7 +12,9 @@ import com.github.javaparser.ast.type.Type;
 import net.sourceforge.plantuml.SourceStringReader;
 
 import java.io.*;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by yutao on 10/6/15.
@@ -55,7 +57,7 @@ public class UmlParser {
 
         sb.append("@startuml\n");
         for (Map.Entry<String, ClassOrInterfaceDeclaration> entry : map.entrySet()) {
-            printClass(entry.getValue());
+            printClassOrInterface(entry.getValue());
         }
         printRelationShip();
         sb.append(relationSB.toString());
@@ -77,18 +79,50 @@ public class UmlParser {
         return null;
     }
 
-    public void printClass(ClassOrInterfaceDeclaration cid) {
+    public void printClassOrInterface(ClassOrInterfaceDeclaration cid) {
         this.currentCID = cid;
-        sb.append("class ").append(cid.getName()).append(" {\n");
-        List<Node> childrenNodes = cid.getChildrenNodes();
-        for (Node childNode : childrenNodes) {
-            if (childNode instanceof FieldDeclaration) {
-                printField((FieldDeclaration) childNode);
-            } else if (childNode instanceof MethodDeclaration) {
-                printMethod((MethodDeclaration) childNode);
+
+        // 1. member and method
+        if (cid.isInterface()) {
+            sb.append("interface ").append(cid.getName()).append(" \n");
+        } else {
+            sb.append("class ").append(cid.getName()).append(" {\n");
+            List<Node> childrenNodes = cid.getChildrenNodes();
+            for (Node childNode : childrenNodes) {
+                if (childNode instanceof FieldDeclaration) {
+                    printField((FieldDeclaration) childNode);
+                } else if (childNode instanceof MethodDeclaration) {
+                    printMethod((MethodDeclaration) childNode);
+                }
+            }
+            sb.append("}\n");
+        }
+
+        // 2. inheritance
+        List<ClassOrInterfaceType> extendsList = cid.getExtends();
+        if (extendsList != null) {
+            for (ClassOrInterfaceType classType : extendsList) {
+                String name = classType.getName();
+                if (map.containsKey(name)) {
+                    String relationKey = name + "_" + cid.getName();
+                    relationshipMap.put(relationKey,
+                            new UmlRelationship(map.get(name), "", cid, "", UmlRelationShipType.EX));
+                }
             }
         }
-        sb.append("}\n");
+
+        // 3. implementation
+        List<ClassOrInterfaceType> implementList = cid.getImplements();
+        if (implementList != null) {
+            for (ClassOrInterfaceType interfaceType : implementList) {
+                String name = interfaceType.getName();
+                if (map.containsKey(name)) {
+                    String relationKey = name + "_" + cid.getName();
+                    relationshipMap.put(relationKey,
+                            new UmlRelationship(map.get(name), "", cid, "", UmlRelationShipType.IM));
+                }
+            }
+        }
     }
 
     public void printField(FieldDeclaration fd) {
@@ -172,15 +206,21 @@ public class UmlParser {
     private void printRelationShip() {
         for (Map.Entry<String, UmlRelationship> entry : relationshipMap.entrySet()) {
             UmlRelationship r = entry.getValue();
-            relationSB.append(r.getA().getName())
-                    .append(" \"")
-                    .append(r.getMultiplicityA())
-                    .append("\" ")
-                    .append(r.getType().getS())
-                    .append(" \"")
-                    .append(r.getMultiplicityB())
-                    .append("\" ")
-                    .append(r.getB().getName())
+            relationSB.append(r.getA().getName()).append(" ");
+            if (r.getType() == UmlRelationShipType.AS) {
+                relationSB.append("\"")
+                        .append(r.getMultiplicityA())
+                        .append("\"");
+
+            }
+            relationSB.append(" ").append(r.getType().getS()).append(" ");
+            if (r.getType() == UmlRelationShipType.AS) {
+
+                relationSB.append("\"")
+                        .append(r.getMultiplicityB())
+                        .append("\"");
+            }
+            relationSB.append(" ").append(r.getB().getName())
                     .append("\n");
         }
     }
@@ -253,6 +293,38 @@ public class UmlParser {
     }
 
     public void printMethod(MethodDeclaration md) {
+        if (!isPublic(md.getModifiers())) {
+            return;
+        }
+        sb.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
+        List<Parameter> parameterList = md.getParameters();
+        if (parameterList != null && parameterList.size() > 0) {
+            int i = 0;
+            for (Parameter p : parameterList) {
+                Type type = p.getType();
+                if (i > 0) {
+                    sb.append(", ");
+                }
+                sb.append(p.getId().getName()).append(":").append(type);
+                if (type instanceof ReferenceType) {
+                    // A a,
+                    Type subType = ((ReferenceType) type).getType();
+                    if (subType instanceof ClassOrInterfaceType) {
+                        String name = ((ClassOrInterfaceType) subType).getName();
+                        if (this.map.containsKey(name)) {
+                            ClassOrInterfaceDeclaration depCID = this.map.get(name);
+                            if (depCID.isInterface()) {
+                                String relationKey = name + "_" + currentCID.getName();
+                                relationshipMap.put(relationKey,
+                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
+                            }
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+        sb.append(") : ").append(md.getType()).append("\n");
     }
 
     public String getModifier(int mod) {
@@ -260,6 +332,14 @@ public class UmlParser {
         if ((mod & ModifierSet.PROTECTED) != 0)     return "#";
         if ((mod & ModifierSet.PRIVATE) != 0)       return "-";
         return "~";
+    }
+
+    private boolean isPublic(int mod) {
+        return (mod & ModifierSet.PUBLIC) != 0;
+    }
+
+    private boolean isPrivate(int mod) {
+        return (mod & ModifierSet.PRIVATE) != 0;
     }
 
     public String draw(String source, String output) {
