@@ -73,10 +73,10 @@ public class UmlParser {
         classDiagramSB.append("@enduml\n");
         sequenceDiagramSB.append("@enduml\n");
         log(classDiagramSB.toString());
-//        draw(classDiagramSB.toString(), filename);
+        draw(classDiagramSB.toString(), filename);
         logln("\n\n\nSequence:");
         log(sequenceDiagramSB.toString());
-        draw(sequenceDiagramSB.toString(), "s.png");
+//        draw(sequenceDiagramSB.toString(), "s.png");
 
     }
 
@@ -211,7 +211,7 @@ public class UmlParser {
             r.setMultiplicityA(multiplicity);
         } else {
             relationshipMap.put(relationKey, new UmlRelationship(currentCID,
-                    "0",
+                    "",
                     relatedCID,
                     multiplicity,
                     UmlRelationShipType.AS));
@@ -222,14 +222,14 @@ public class UmlParser {
         for (Map.Entry<String, UmlRelationship> entry : relationshipMap.entrySet()) {
             UmlRelationship r = entry.getValue();
             relationSB.append(r.getA().getName()).append(" ");
-            if (r.getType() == UmlRelationShipType.AS) {
+            if (r.getType() == UmlRelationShipType.AS && r.getMultiplicityA().length() > 0) {
                 relationSB.append("\"")
                         .append(r.getMultiplicityA())
                         .append("\"");
 
             }
             relationSB.append(" ").append(r.getType().getS()).append(" ");
-            if (r.getType() == UmlRelationShipType.AS) {
+            if (r.getType() == UmlRelationShipType.AS && r.getMultiplicityB().length() > 0) {
 
                 relationSB.append("\"")
                         .append(r.getMultiplicityB())
@@ -334,7 +334,7 @@ public class UmlParser {
                             if (depCID.isInterface()) {
                                 String relationKey = name + "_" + currentCID.getName();
                                 relationshipMap.put(relationKey,
-                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
+                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.LOLI));
                             }
 
                             List<VariableDeclaratorId> ids = new LinkedList<>();
