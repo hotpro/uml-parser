@@ -80,7 +80,6 @@ public class UmlParser {
 
     }
 
-
     private ClassOrInterfaceDeclaration parseClassOrInterfaceDeclaration(CompilationUnit cu) {
         List<Node> nodes = cu.getChildrenNodes();
         if (nodes != null) {
@@ -98,7 +97,16 @@ public class UmlParser {
 
         // 1. member and method
         if (cid.isInterface()) {
-            classDiagramSB.append("interface ").append(cid.getName()).append(" \n");
+            classDiagramSB.append("interface ").append(cid.getName()).append(" {\n");
+            List<Node> childrenNodes = cid.getChildrenNodes();
+            for (Node childNode : childrenNodes) {
+                if (childNode instanceof FieldDeclaration) {
+                    printField((FieldDeclaration) childNode);
+                } else if (childNode instanceof MethodDeclaration) {
+                    printMethod((MethodDeclaration) childNode);
+                }
+            }
+            classDiagramSB.append("}\n");
         } else {
             classDiagramSB.append("class ").append(cid.getName()).append(" {\n");
             List<Node> childrenNodes = cid.getChildrenNodes();
@@ -107,6 +115,8 @@ public class UmlParser {
                     printField((FieldDeclaration) childNode);
                 } else if (childNode instanceof MethodDeclaration) {
                     printMethod((MethodDeclaration) childNode);
+                } else if (childNode instanceof ConstructorDeclaration) {
+                    printConstructor((ConstructorDeclaration) childNode);
                 }
             }
             classDiagramSB.append("}\n");
@@ -139,7 +149,65 @@ public class UmlParser {
         }
     }
 
+    private void printConstructor(ConstructorDeclaration md) {
+        //Public Methods (ignore private, package and protected scope)
+        if (!isPublic(md.getModifiers())) {
+            return;
+        }
+        Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
+        Map<String, String> variableNameMap = new HashMap<>();
+        classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
+        List<Parameter> parameterList = md.getParameters();
+        printParams(variableMap, variableNameMap, parameterList);
+        classDiagramSB.append(")\n");
+
+        BlockStmt body = md.getBlock();
+        printBody(variableMap, variableNameMap, body);
+    }
+
+    private void printParams(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, List<Parameter> parameterList) {
+        if (parameterList != null && parameterList.size() > 0) {
+            int i = 0;
+            for (Parameter p : parameterList) {
+                Type type = p.getType();
+                if (i > 0) {
+                    classDiagramSB.append(", ");
+                }
+                classDiagramSB.append(p.getId().getName()).append(":").append(type);
+                if (type instanceof ReferenceType) {
+                    // A a,
+                    Type subType = ((ReferenceType) type).getType();
+                    if (subType instanceof ClassOrInterfaceType) {
+                        String name = ((ClassOrInterfaceType) subType).getName();
+                        // Dependency
+                        if (this.classMap.containsKey(name)) {
+                            ClassOrInterfaceDeclaration depCID = this.classMap.get(name);
+                            if (depCID.isInterface()) {
+                                String relationKey = name + "_" + currentCID.getName();
+                                relationshipMap.put(relationKey,
+                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.LOLI));
+                            }
+
+                            List<VariableDeclaratorId> ids = new LinkedList<>();
+                            ids.add(p.getId());
+                            variableMap.put(name, ids);
+
+                            variableNameMap.put(p.getId().getName(), name);
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+    }
+
     public void printField(FieldDeclaration fd) {
+
+        // Private and Public Attributes (ignore package and protected scope)
+        if (!isPrivate(fd.getModifiers()) && !isPublic(fd.getModifiers())) {
+            return;
+        }
+
         Type type = fd.getType();
 
         // Relationship
@@ -308,6 +376,8 @@ public class UmlParser {
     }
 
     public void printMethod(MethodDeclaration md) {
+
+        //Public Methods (ignore private, package and protected scope)
         if (!isPublic(md.getModifiers())) {
             return;
         }
@@ -315,45 +385,23 @@ public class UmlParser {
         Map<String, String> variableNameMap = new HashMap<>();
         classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
         List<Parameter> parameterList = md.getParameters();
-        if (parameterList != null && parameterList.size() > 0) {
-            int i = 0;
-            for (Parameter p : parameterList) {
-                Type type = p.getType();
-                if (i > 0) {
-                    classDiagramSB.append(", ");
-                }
-                classDiagramSB.append(p.getId().getName()).append(":").append(type);
-                if (type instanceof ReferenceType) {
-                    // A a,
-                    Type subType = ((ReferenceType) type).getType();
-                    if (subType instanceof ClassOrInterfaceType) {
-                        String name = ((ClassOrInterfaceType) subType).getName();
-                        // Dependency
-                        if (this.classMap.containsKey(name)) {
-                            ClassOrInterfaceDeclaration depCID = this.classMap.get(name);
-                            if (depCID.isInterface()) {
-                                String relationKey = name + "_" + currentCID.getName();
-                                relationshipMap.put(relationKey,
-                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.LOLI));
-                            }
-
-                            List<VariableDeclaratorId> ids = new LinkedList<>();
-                            ids.add(p.getId());
-                            variableMap.put(name, ids);
-
-                            variableNameMap.put(p.getId().getName(), name);
-                        }
-                    }
-                }
-                i++;
-            }
-        }
+        printParams(variableMap, variableNameMap, parameterList);
         classDiagramSB.append(") : ").append(md.getType()).append("\n");
 
-        // body, sequence diagram
         BlockStmt body = md.getBody();
-        List<Statement> expressionStmtList = body.getStmts();
-        if (expressionStmtList != null) {
+        printBody(variableMap, variableNameMap, body);
+    }
+
+    private void printBody(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, BlockStmt body) {
+        // body, sequence diagram
+        do {
+            if (body == null) {
+                break;
+            }
+            List<Statement> expressionStmtList = body.getStmts();
+            if (expressionStmtList == null) {
+                break;
+            }
             for (Statement stmt : expressionStmtList) {
                 if (stmt instanceof ExpressionStmt) {
                     Expression expression = ((ExpressionStmt) stmt).getExpression();
@@ -372,27 +420,29 @@ public class UmlParser {
                                     ((VariableDeclarationExpr) expression).getType().toString());
                         }
                     } else if (expression instanceof MethodCallExpr) {
-                        String scope = ((MethodCallExpr) expression).getScope().toString();
+                        Expression scopeExp = ((MethodCallExpr) expression).getScope();
                         String methodName = ((MethodCallExpr) expression).getName();
-                        if (variableNameMap.containsKey(scope)) {
-                            String className = variableNameMap.get(scope);
-                            if (classMap.containsKey(className)) {
-                                sequenceDiagramSB.append(this.currentCID.getName())
-                                        .append(" ")
-                                        .append("->")
-                                        .append(" ")
-                                        .append(className)
-                                        .append(": ")
-                                        .append(methodName)
-                                        .append("\n");
+                        if (scopeExp != null) {
+                            String scope = scopeExp.toString();
+                            if (variableNameMap.containsKey(scope)) {
+                                String className = variableNameMap.get(scope);
+                                if (classMap.containsKey(className)) {
+                                    sequenceDiagramSB.append(this.currentCID.getName())
+                                            .append(" ")
+                                            .append("->")
+                                            .append(" ")
+                                            .append(className)
+                                            .append(": ")
+                                            .append(methodName)
+                                            .append("\n");
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-
+        } while (false);
     }
 
     public String getModifier(int mod) {
