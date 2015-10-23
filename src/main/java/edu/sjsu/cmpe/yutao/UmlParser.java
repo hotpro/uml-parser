@@ -149,58 +149,6 @@ public class UmlParser {
         }
     }
 
-    private void printConstructor(ConstructorDeclaration md) {
-        //Public Methods (ignore private, package and protected scope)
-        if (!isPublic(md.getModifiers())) {
-            return;
-        }
-        Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
-        Map<String, String> variableNameMap = new HashMap<>();
-        classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
-        List<Parameter> parameterList = md.getParameters();
-        printParams(variableMap, variableNameMap, parameterList);
-        classDiagramSB.append(")\n");
-
-        BlockStmt body = md.getBlock();
-        printBody(variableMap, variableNameMap, body);
-    }
-
-    private void printParams(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, List<Parameter> parameterList) {
-        if (parameterList != null && parameterList.size() > 0) {
-            int i = 0;
-            for (Parameter p : parameterList) {
-                Type type = p.getType();
-                if (i > 0) {
-                    classDiagramSB.append(", ");
-                }
-                classDiagramSB.append(p.getId().getName()).append(":").append(type);
-                if (type instanceof ReferenceType) {
-                    // A a,
-                    Type subType = ((ReferenceType) type).getType();
-                    if (subType instanceof ClassOrInterfaceType) {
-                        String name = ((ClassOrInterfaceType) subType).getName();
-                        // Dependency
-                        if (this.classMap.containsKey(name)) {
-                            ClassOrInterfaceDeclaration depCID = this.classMap.get(name);
-                            if (depCID.isInterface()) {
-                                String relationKey = name + "_" + currentCID.getName();
-                                relationshipMap.put(relationKey,
-                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.LOLI));
-                            }
-
-                            List<VariableDeclaratorId> ids = new LinkedList<>();
-                            ids.add(p.getId());
-                            variableMap.put(name, ids);
-
-                            variableNameMap.put(p.getId().getName(), name);
-                        }
-                    }
-                }
-                i++;
-            }
-        }
-    }
-
     public void printField(FieldDeclaration fd) {
 
         // Private and Public Attributes (ignore package and protected scope)
@@ -264,6 +212,128 @@ public class UmlParser {
             // primitive type. int i
             printPrimitiveType(fd);
         }
+    }
+
+    public void printMethod(MethodDeclaration md) {
+
+        //Public Methods (ignore private, package and protected scope)
+        if (!isPublic(md.getModifiers())) {
+            return;
+        }
+        Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
+        Map<String, String> variableNameMap = new HashMap<>();
+        classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
+        List<Parameter> parameterList = md.getParameters();
+        printParams(variableMap, variableNameMap, parameterList);
+        classDiagramSB.append(") : ").append(md.getType()).append("\n");
+
+        BlockStmt body = md.getBody();
+        printBody(variableMap, variableNameMap, body);
+    }
+
+    private void printConstructor(ConstructorDeclaration md) {
+        //Public Methods (ignore private, package and protected scope)
+        if (!isPublic(md.getModifiers())) {
+            return;
+        }
+        Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
+        Map<String, String> variableNameMap = new HashMap<>();
+        classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
+        List<Parameter> parameterList = md.getParameters();
+        printParams(variableMap, variableNameMap, parameterList);
+        classDiagramSB.append(")\n");
+
+        BlockStmt body = md.getBlock();
+        printBody(variableMap, variableNameMap, body);
+    }
+
+    private void printParams(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, List<Parameter> parameterList) {
+        if (parameterList != null && parameterList.size() > 0) {
+            int i = 0;
+            for (Parameter p : parameterList) {
+                Type type = p.getType();
+                if (i > 0) {
+                    classDiagramSB.append(", ");
+                }
+                classDiagramSB.append(p.getId().getName()).append(":").append(type);
+                if (type instanceof ReferenceType) {
+                    // A a,
+                    Type subType = ((ReferenceType) type).getType();
+                    if (subType instanceof ClassOrInterfaceType) {
+                        String name = ((ClassOrInterfaceType) subType).getName();
+                        // Dependency
+                        if (this.classMap.containsKey(name)) {
+                            ClassOrInterfaceDeclaration depCID = this.classMap.get(name);
+                            if (depCID.isInterface()) {
+                                String relationKey = name + "_" + currentCID.getName();
+                                relationshipMap.put(relationKey,
+                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.LOLI));
+                            }
+
+                            List<VariableDeclaratorId> ids = new LinkedList<>();
+                            ids.add(p.getId());
+                            variableMap.put(name, ids);
+
+                            variableNameMap.put(p.getId().getName(), name);
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+    }
+
+    private void printBody(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, BlockStmt body) {
+        // body, sequence diagram
+        do {
+            if (body == null) {
+                break;
+            }
+            List<Statement> expressionStmtList = body.getStmts();
+            if (expressionStmtList == null) {
+                break;
+            }
+            for (Statement stmt : expressionStmtList) {
+                if (stmt instanceof ExpressionStmt) {
+                    Expression expression = ((ExpressionStmt) stmt).getExpression();
+                    if (expression instanceof VariableDeclarationExpr) {
+                        if (classMap.containsKey(((VariableDeclarationExpr) expression).getType().toString())) {
+                            List<VariableDeclaratorId> list = null;
+                            if (variableMap.containsKey(((VariableDeclarationExpr) expression).getType().toString())) {
+                                list = variableMap.get(((VariableDeclarationExpr) expression).getType().toString());
+                            } else {
+                                list = new LinkedList<>();
+                                variableMap.put(((VariableDeclarationExpr) expression).getType().toString(),
+                                        list);
+                            }
+                            list.add(((VariableDeclarationExpr) expression).getVars().get(0).getId());
+                            variableNameMap.put(((VariableDeclarationExpr) expression).getVars().get(0).getId().getName(),
+                                    ((VariableDeclarationExpr) expression).getType().toString());
+                        }
+                    } else if (expression instanceof MethodCallExpr) {
+                        Expression scopeExp = ((MethodCallExpr) expression).getScope();
+                        String methodName = ((MethodCallExpr) expression).getName();
+                        if (scopeExp != null) {
+                            String scope = scopeExp.toString();
+                            if (variableNameMap.containsKey(scope)) {
+                                String className = variableNameMap.get(scope);
+                                if (classMap.containsKey(className)) {
+                                    sequenceDiagramSB.append(this.currentCID.getName())
+                                            .append(" ")
+                                            .append("->")
+                                            .append(" ")
+                                            .append(className)
+                                            .append(": ")
+                                            .append(methodName)
+                                            .append("\n");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        } while (false);
     }
 
     private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
@@ -373,76 +443,6 @@ public class UmlParser {
         }
 
         return false;
-    }
-
-    public void printMethod(MethodDeclaration md) {
-
-        //Public Methods (ignore private, package and protected scope)
-        if (!isPublic(md.getModifiers())) {
-            return;
-        }
-        Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
-        Map<String, String> variableNameMap = new HashMap<>();
-        classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
-        List<Parameter> parameterList = md.getParameters();
-        printParams(variableMap, variableNameMap, parameterList);
-        classDiagramSB.append(") : ").append(md.getType()).append("\n");
-
-        BlockStmt body = md.getBody();
-        printBody(variableMap, variableNameMap, body);
-    }
-
-    private void printBody(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, BlockStmt body) {
-        // body, sequence diagram
-        do {
-            if (body == null) {
-                break;
-            }
-            List<Statement> expressionStmtList = body.getStmts();
-            if (expressionStmtList == null) {
-                break;
-            }
-            for (Statement stmt : expressionStmtList) {
-                if (stmt instanceof ExpressionStmt) {
-                    Expression expression = ((ExpressionStmt) stmt).getExpression();
-                    if (expression instanceof VariableDeclarationExpr) {
-                        if (classMap.containsKey(((VariableDeclarationExpr) expression).getType().toString())) {
-                            List<VariableDeclaratorId> list = null;
-                            if (variableMap.containsKey(((VariableDeclarationExpr) expression).getType().toString())) {
-                                list = variableMap.get(((VariableDeclarationExpr) expression).getType().toString());
-                            } else {
-                                list = new LinkedList<>();
-                                variableMap.put(((VariableDeclarationExpr) expression).getType().toString(),
-                                        list);
-                            }
-                            list.add(((VariableDeclarationExpr) expression).getVars().get(0).getId());
-                            variableNameMap.put(((VariableDeclarationExpr) expression).getVars().get(0).getId().getName(),
-                                    ((VariableDeclarationExpr) expression).getType().toString());
-                        }
-                    } else if (expression instanceof MethodCallExpr) {
-                        Expression scopeExp = ((MethodCallExpr) expression).getScope();
-                        String methodName = ((MethodCallExpr) expression).getName();
-                        if (scopeExp != null) {
-                            String scope = scopeExp.toString();
-                            if (variableNameMap.containsKey(scope)) {
-                                String className = variableNameMap.get(scope);
-                                if (classMap.containsKey(className)) {
-                                    sequenceDiagramSB.append(this.currentCID.getName())
-                                            .append(" ")
-                                            .append("->")
-                                            .append(" ")
-                                            .append(className)
-                                            .append(": ")
-                                            .append(methodName)
-                                            .append("\n");
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-        } while (false);
     }
 
     public String getModifier(int mod) {
