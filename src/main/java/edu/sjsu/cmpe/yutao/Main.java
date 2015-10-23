@@ -6,7 +6,7 @@ package edu.sjsu.cmpe.yutao;
 public class Main {
     public static void main(String[] args) {
         args = new String[2];
-        String suffix = "4";
+        int suffix = 4;
         args[0] = "code/uml-parser-test-" + suffix;
         args[1] = "output" + suffix + ".png";
         if (args == null || args.length < 2) {
@@ -14,6 +14,7 @@ public class Main {
         }
         new UmlParser(args[0], args[1]).go();
 
+        System.out.println("\n\n\n");
         System.out.println("done");
     }
 }

@@ -262,12 +262,14 @@ public class UmlParser {
                     if (subType instanceof ClassOrInterfaceType) {
                         String name = ((ClassOrInterfaceType) subType).getName();
                         // Dependency
-                        if (this.classMap.containsKey(name)) {
+
+                        String relationKey = getASRelationKey(name, currentCID.getName());
+                        // if they have stronger relationship, ignore dependency
+                        if (!relationshipMap.containsKey(relationKey) && this.classMap.containsKey(name) ) {
                             ClassOrInterfaceDeclaration depCID = this.classMap.get(name);
                             if (depCID.isInterface()) {
-                                String relationKey = name + "_" + currentCID.getName();
                                 relationshipMap.put(relationKey,
-                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.LOLI));
+                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
                             }
 
                             List<VariableDeclaratorId> ids = new LinkedList<>();
@@ -338,12 +340,7 @@ public class UmlParser {
 
     private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
         ClassOrInterfaceDeclaration relatedCID = classMap.get(subType.getName());
-        String relationKey = null;
-        if (currentCID.getName().compareTo(relatedCID.getName()) < 0) {
-            relationKey = currentCID.getName() + "_" + relatedCID.getName();
-        } else {
-            relationKey = relatedCID.getName() + "_" + currentCID.getName();
-        }
+        String relationKey = getASRelationKey(currentCID.getName(), relatedCID.getName());
         if (relationshipMap.containsKey(relationKey)) {
             UmlRelationship r = relationshipMap.get(relationKey);
             r.setMultiplicityA(multiplicity);
@@ -354,6 +351,13 @@ public class UmlParser {
                     multiplicity,
                     UmlRelationShipType.AS));
         }
+    }
+
+    private String getASRelationKey(String name1, String name2) {
+        if (name1.compareTo(name2) < 0) {
+            return name1 + "_" + name2;
+        }
+        return name2 + "_" + name1;
     }
 
     private void printRelationShip() {
