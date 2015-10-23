@@ -220,7 +220,10 @@ public class UmlParser {
         if (!isPublic(md.getModifiers())) {
             return;
         }
+        // class name -> variable names
         Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
+
+        // variableName -> class name
         Map<String, String> variableNameMap = new HashMap<>();
         classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
         List<Parameter> parameterList = md.getParameters();
@@ -260,28 +263,33 @@ public class UmlParser {
                     // A a,
                     Type subType = ((ReferenceType) type).getType();
                     if (subType instanceof ClassOrInterfaceType) {
-                        String name = ((ClassOrInterfaceType) subType).getName();
-                        // Dependency
+                        String depName = ((ClassOrInterfaceType) subType).getName();
 
-                        String relationKey = getASRelationKey(name, currentCID.getName());
-                        // if they have stronger relationship, ignore dependency
-                        if (!relationshipMap.containsKey(relationKey) && this.classMap.containsKey(name) ) {
-                            ClassOrInterfaceDeclaration depCID = this.classMap.get(name);
-                            if (depCID.isInterface()) {
-                                relationshipMap.put(relationKey,
-                                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
-                            }
+                        if (this.classMap.containsKey(depName) ) {
 
+                            // Dependency
+                            printDependency(depName);
+
+                            // cache variable for sequence
                             List<VariableDeclaratorId> ids = new LinkedList<>();
                             ids.add(p.getId());
-                            variableMap.put(name, ids);
-
-                            variableNameMap.put(p.getId().getName(), name);
+                            variableMap.put(depName, ids);
+                            variableNameMap.put(p.getId().getName(), depName);
                         }
                     }
                 }
                 i++;
             }
+        }
+    }
+
+    private void printDependency(String depName) {
+        ClassOrInterfaceDeclaration depCID = this.classMap.get(depName);
+        String relationKey = getASRelationKey(depName, currentCID.getName());
+        // if they have stronger relationship, ignore dependency
+        if (!relationshipMap.containsKey(relationKey) && depCID.isInterface()) {
+            relationshipMap.put(relationKey,
+                    new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
         }
     }
 
@@ -299,18 +307,22 @@ public class UmlParser {
                 if (stmt instanceof ExpressionStmt) {
                     Expression expression = ((ExpressionStmt) stmt).getExpression();
                     if (expression instanceof VariableDeclarationExpr) {
-                        if (classMap.containsKey(((VariableDeclarationExpr) expression).getType().toString())) {
+                        String depName = ((VariableDeclarationExpr) expression).getType().toString();
+                        if (classMap.containsKey(depName)) {
+                            // dependency
+                            printDependency(depName);
+
                             List<VariableDeclaratorId> list = null;
-                            if (variableMap.containsKey(((VariableDeclarationExpr) expression).getType().toString())) {
-                                list = variableMap.get(((VariableDeclarationExpr) expression).getType().toString());
+                            if (variableMap.containsKey(depName)) {
+                                list = variableMap.get(depName);
                             } else {
                                 list = new LinkedList<>();
-                                variableMap.put(((VariableDeclarationExpr) expression).getType().toString(),
+                                variableMap.put(depName,
                                         list);
                             }
                             list.add(((VariableDeclarationExpr) expression).getVars().get(0).getId());
                             variableNameMap.put(((VariableDeclarationExpr) expression).getVars().get(0).getId().getName(),
-                                    ((VariableDeclarationExpr) expression).getType().toString());
+                                    depName);
                         }
                     } else if (expression instanceof MethodCallExpr) {
                         Expression scopeExp = ((MethodCallExpr) expression).getScope();
