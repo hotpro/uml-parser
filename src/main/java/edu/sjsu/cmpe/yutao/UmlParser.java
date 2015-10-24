@@ -18,10 +18,7 @@ import com.github.javaparser.ast.type.Type;
 import net.sourceforge.plantuml.SourceStringReader;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by yutao on 10/6/15.
@@ -36,6 +33,8 @@ public class UmlParser {
     private Map<String, UmlRelationship> relationshipMap = new HashMap<>();
     private StringBuilder classDiagramSB = new StringBuilder();
     private StringBuilder sequenceDiagramSB = new StringBuilder();
+
+    private Set<String> getterSetter;
 
     public UmlParser(String path, String filename) {
 
@@ -94,6 +93,7 @@ public class UmlParser {
 
     public void printClassOrInterface(ClassOrInterfaceDeclaration cid) {
         this.currentCID = cid;
+        getterSetter = new HashSet<>();
 
         // 1. member and method
         if (cid.isInterface()) {
@@ -217,7 +217,9 @@ public class UmlParser {
     public void printMethod(MethodDeclaration md) {
 
         //Public Methods (ignore private, package and protected scope)
-        if (!isPublic(md.getModifiers())) {
+        // ignore getter setter
+        if (!isPublic(md.getModifiers())
+                || getterSetter.contains(md.getName())) {
             return;
         }
         // class name -> variable names
@@ -395,11 +397,38 @@ public class UmlParser {
     }
 
     private void printPrimitiveType(FieldDeclaration fd) {
-        classDiagramSB.append(getModifier(fd.getModifiers()));
+        // Support also Java Style Public Attributes as "setters and getters"
+        String m = isGetSetAttr(fd) ? "+" : getModifier(fd.getModifiers());
+        classDiagramSB.append(m);
         classDiagramSB.append(" ");
         classDiagramSB.append(fd.getVariables().get(0).getId().getName());
         classDiagramSB.append(" : ").append(fd.getType());
         classDiagramSB.append("\n");
+    }
+
+    private boolean isGetSetAttr(FieldDeclaration fd) {
+        List<Node> childrenNodes = currentCID.getChildrenNodes();
+        String name = fd.getVariables().get(0).getId().getName();
+        name = name.substring(0, 1).toUpperCase() + name.substring(1);
+        boolean hasGet = false, hasSet = false;
+        String getter = "", setter = "";
+        for (Node node : childrenNodes) {
+            if (node instanceof MethodDeclaration) {
+                if (((MethodDeclaration) node).getName().equals("get" + name)) {
+                    hasGet = true;
+                    getter = ((MethodDeclaration) node).getName();
+                }
+                if (((MethodDeclaration) node).getName().equals("set" + name)) {
+                    hasSet = true;
+                    setter = ((MethodDeclaration) node).getName();
+                }
+            }
+        }
+        if (hasGet && hasSet) {
+            getterSetter.add(getter);
+            getterSetter.add(setter);
+        }
+        return hasGet && hasSet;
     }
 
     private void parseFiled(FieldDeclaration fd) {
