@@ -8,7 +8,8 @@ public enum UmlRelationShipType {
     IM("<|.."),
     AS("--"),
     DEP("<.."),
-    LOLI("()--");
+    IM_LOLI("()--"),
+    DEP_LOLI("-0)-");
 
     private String s;
     UmlRelationShipType(String s) {

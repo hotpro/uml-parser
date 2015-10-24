@@ -143,7 +143,7 @@ public class UmlParser {
                 if (classMap.containsKey(name)) {
                     String relationKey = name + "_" + cid.getName();
                     relationshipMap.put(relationKey,
-                            new UmlRelationship(classMap.get(name), "", cid, "", UmlRelationShipType.IM));
+                            new UmlRelationship(classMap.get(name), "", cid, "", UmlRelationShipType.IM_LOLI));
                 }
             }
         }
@@ -291,7 +291,7 @@ public class UmlParser {
         // if they have stronger relationship, ignore dependency
         if (!relationshipMap.containsKey(relationKey) && depCID.isInterface()) {
             relationshipMap.put(relationKey,
-                    new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
+                    new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP_LOLI));
         }
     }
 
