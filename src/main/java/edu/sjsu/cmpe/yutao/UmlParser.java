@@ -100,24 +100,12 @@ public class UmlParser {
             classDiagramSB.append("interface ").append(cid.getName()).append(" {\n");
             List<Node> childrenNodes = cid.getChildrenNodes();
             for (Node childNode : childrenNodes) {
-                if (childNode instanceof FieldDeclaration) {
-                    printField((FieldDeclaration) childNode);
-                } else if (childNode instanceof MethodDeclaration) {
-                    printMethod((MethodDeclaration) childNode);
-                }
             }
             classDiagramSB.append("}\n");
         } else {
             classDiagramSB.append("class ").append(cid.getName()).append(" {\n");
             List<Node> childrenNodes = cid.getChildrenNodes();
             for (Node childNode : childrenNodes) {
-                if (childNode instanceof FieldDeclaration) {
-                    printField((FieldDeclaration) childNode);
-                } else if (childNode instanceof MethodDeclaration) {
-                    printMethod((MethodDeclaration) childNode);
-                } else if (childNode instanceof ConstructorDeclaration) {
-                    printConstructor((ConstructorDeclaration) childNode);
-                }
             }
             classDiagramSB.append("}\n");
         }
@@ -147,91 +135,6 @@ public class UmlParser {
                 }
             }
         }
-    }
-
-    public void printField(FieldDeclaration fd) {
-
-        // Private and Public Attributes (ignore package and protected scope)
-        if (!isPrivate(fd.getModifiers()) && !isPublic(fd.getModifiers())) {
-            return;
-        }
-
-        Type type = fd.getType();
-
-        // Relationship
-        if (type instanceof ReferenceType) {
-            Type subType = ((ReferenceType) type).getType();
-            if (((ReferenceType) type).getArrayCount() > 0) {
-                // array. int[], B[], String[]
-
-                if (subType instanceof PrimitiveType) {
-                    // int[]
-                    printPrimitiveType(fd);
-
-                } else if (subType instanceof ClassOrInterfaceType){
-                    if (classMap.containsKey(((ClassOrInterfaceType) subType).getName())) {
-                        // B[],
-                        createRelationship((ClassOrInterfaceType) subType, "*");
-                    } else {
-                        // String[]
-                        printPrimitiveType(fd);
-
-                    }
-                }
-            } else {
-                // Collection<B>, B b, String s
-                if (subType instanceof ClassOrInterfaceType) {
-                    if (((ClassOrInterfaceType) subType).getTypeArgs() != null) {
-                        // Collection<B>, Collectio<String>
-                        Type typeArg = (((ClassOrInterfaceType) subType).getTypeArgs().get(0));
-                        if (typeArg instanceof ReferenceType) {
-                            Type subsubsubType = ((ReferenceType) typeArg).getType();
-                            if (subsubsubType instanceof ClassOrInterfaceType) {
-                                if (classMap.containsKey(((ClassOrInterfaceType) subsubsubType).getName())) {
-                                    // Collection<B>
-                                    createRelationship((ClassOrInterfaceType) subsubsubType, "*");
-                                } else {
-                                    // TODO:
-                                    // Collection<String>
-                                    printPrimitiveType(fd);
-                                }
-                            }
-                        }
-                    } else {
-                        if (classMap.containsKey(((ClassOrInterfaceType) subType).getName())) {
-                            // B b,
-                            createRelationship((ClassOrInterfaceType) subType, "1");
-                        } else {
-                            // String s
-                            printPrimitiveType(fd);
-                        }
-                    }
-                }
-            }
-        } else {
-            // primitive type. int i
-            printPrimitiveType(fd);
-        }
-    }
-
-    public void printMethod(MethodDeclaration md) {
-
-        //Public Methods (ignore private, package and protected scope)
-        if (!isPublic(md.getModifiers())) {
-            return;
-        }
-        // class name -> variable names
-        Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
-
-        // variableName -> class name
-        Map<String, String> variableNameMap = new HashMap<>();
-        classDiagramSB.append(getModifier(md.getModifiers())).append(md.getName()).append("(");
-        List<Parameter> parameterList = md.getParameters();
-        printParams(variableMap, variableNameMap, parameterList);
-        classDiagramSB.append(") : ").append(md.getType()).append("\n");
-
-        BlockStmt body = md.getBody();
-        printBody(variableMap, variableNameMap, body);
     }
 
     private void printConstructor(ConstructorDeclaration md) {
