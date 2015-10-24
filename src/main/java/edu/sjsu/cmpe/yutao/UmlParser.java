@@ -33,7 +33,6 @@ public class UmlParser {
     private HashMap<String, ClassOrInterfaceDeclaration> classMap;
     private ClassOrInterfaceDeclaration currentCID = null;
     private StringBuilder relationSB = new StringBuilder();
-    private Map<String, UmlRelationship> relationshipMap = new HashMap<>();
     private StringBuilder classDiagramSB = new StringBuilder();
     private StringBuilder sequenceDiagramSB = new StringBuilder();
 
@@ -117,8 +116,6 @@ public class UmlParser {
                 String name = classType.getName();
                 if (classMap.containsKey(name)) {
                     String relationKey = name + "_" + cid.getName();
-                    relationshipMap.put(relationKey,
-                            new UmlRelationship(classMap.get(name), "", cid, "", UmlRelationShipType.EX));
                 }
             }
         }
@@ -130,8 +127,6 @@ public class UmlParser {
                 String name = interfaceType.getName();
                 if (classMap.containsKey(name)) {
                     String relationKey = name + "_" + cid.getName();
-                    relationshipMap.put(relationKey,
-                            new UmlRelationship(classMap.get(name), "", cid, "", UmlRelationShipType.IM));
                 }
             }
         }
@@ -190,10 +185,6 @@ public class UmlParser {
         ClassOrInterfaceDeclaration depCID = this.classMap.get(depName);
         String relationKey = getASRelationKey(depName, currentCID.getName());
         // if they have stronger relationship, ignore dependency
-        if (!relationshipMap.containsKey(relationKey) && depCID.isInterface()) {
-            relationshipMap.put(relationKey,
-                    new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
-        }
     }
 
     private void printBody(Map<String, List<VariableDeclaratorId>> variableMap, Map<String, String> variableNameMap, BlockStmt body) {
@@ -256,16 +247,6 @@ public class UmlParser {
     private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
         ClassOrInterfaceDeclaration relatedCID = classMap.get(subType.getName());
         String relationKey = getASRelationKey(currentCID.getName(), relatedCID.getName());
-        if (relationshipMap.containsKey(relationKey)) {
-            UmlRelationship r = relationshipMap.get(relationKey);
-            r.setMultiplicityA(multiplicity);
-        } else {
-            relationshipMap.put(relationKey, new UmlRelationship(currentCID,
-                    "",
-                    relatedCID,
-                    multiplicity,
-                    UmlRelationShipType.AS));
-        }
     }
 
     private String getASRelationKey(String name1, String name2) {
@@ -276,25 +257,6 @@ public class UmlParser {
     }
 
     private void printRelationShip() {
-        for (Map.Entry<String, UmlRelationship> entry : relationshipMap.entrySet()) {
-            UmlRelationship r = entry.getValue();
-            relationSB.append(r.getA().getName()).append(" ");
-            if (r.getType() == UmlRelationShipType.AS && r.getMultiplicityA().length() > 0) {
-                relationSB.append("\"")
-                        .append(r.getMultiplicityA())
-                        .append("\"");
-
-            }
-            relationSB.append(" ").append(r.getType().getS()).append(" ");
-            if (r.getType() == UmlRelationShipType.AS && r.getMultiplicityB().length() > 0) {
-
-                relationSB.append("\"")
-                        .append(r.getMultiplicityB())
-                        .append("\"");
-            }
-            relationSB.append(" ").append(r.getB().getName())
-                    .append("\n");
-        }
     }
 
     private void printPrimitiveType(FieldDeclaration fd) {
