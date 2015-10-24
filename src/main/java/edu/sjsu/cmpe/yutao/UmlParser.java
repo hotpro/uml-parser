@@ -33,6 +33,7 @@ public class UmlParser {
     private Map<String, UmlRelationship> relationshipMap = new HashMap<>();
     private StringBuilder classDiagramSB = new StringBuilder();
     private StringBuilder sequenceDiagramSB = new StringBuilder();
+    Deque<ClassOrInterfaceDeclaration> sequenceList = new LinkedList<>();
 
     private Set<String> getterSetter;
 
@@ -70,13 +71,14 @@ public class UmlParser {
         printRelationShip();
         classDiagramSB.append(relationSB.toString());
         classDiagramSB.append("@enduml\n");
-        sequenceDiagramSB.append("@enduml\n");
         log(classDiagramSB.toString());
-        draw(classDiagramSB.toString(), filename);
+//        draw(classDiagramSB.toString(), filename);
         logln("\n\n\nSequence:");
-        log(sequenceDiagramSB.toString());
-//        draw(sequenceDiagramSB.toString(), "s.png");
 
+        printReturnMsg();
+        sequenceDiagramSB.append("@enduml\n");
+        log(sequenceDiagramSB.toString());
+        draw(sequenceDiagramSB.toString(), "s.png");
     }
 
     private ClassOrInterfaceDeclaration parseClassOrInterfaceDeclaration(CompilationUnit cu) {
@@ -342,6 +344,10 @@ public class UmlParser {
                                             .append(": ")
                                             .append(methodName)
                                             .append("\n");
+                                    if (sequenceList.peekLast() != this.currentCID) {
+                                        sequenceList.offerLast(this.currentCID);
+                                    }
+                                    sequenceList.offerLast(classMap.get(className));
                                 }
                             }
                         }
@@ -350,6 +356,18 @@ public class UmlParser {
             }
 
         } while (false);
+    }
+
+    private void printReturnMsg() {
+        while (sequenceList.size() >= 2) {
+            ClassOrInterfaceDeclaration last = sequenceList.pollLast();
+            sequenceDiagramSB.append(last.getName())
+                    .append(" ")
+                    .append("-->")
+                    .append(" ")
+                    .append(sequenceList.peekLast().getName())
+                    .append("\n");
+        }
     }
 
     private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
