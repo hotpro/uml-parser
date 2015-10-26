@@ -27,18 +27,23 @@ public class UmlParser {
 
     private final String path;
     private final String filename;
-    private HashMap<String, ClassOrInterfaceDeclaration> classMap;
+    private Map<String, ClassOrInterfaceDeclaration> classMap;
     private ClassOrInterfaceDeclaration currentCID = null;
+    private UmlSDActor currentUmlSDActor = null;
     private StringBuilder relationSB = new StringBuilder();
     private Map<String, UmlRelationship> relationshipMap = new HashMap<>();
     private StringBuilder classDiagramSB = new StringBuilder();
     private StringBuilder sequenceDiagramSB = new StringBuilder();
-    Deque<ClassOrInterfaceDeclaration> sequenceList = new LinkedList<>();
+
+    // class name -> umlsdactor
+    private Map<String, UmlSDActor> sdActorMap = new HashMap<>();
+
+    /** the class which has public static void main method*/
+    private String psvmMethodClass;
 
     private Set<String> getterSetter;
 
     public UmlParser(String path, String filename) {
-
         this.path = path;
         this.filename = filename;
     }
@@ -55,7 +60,9 @@ public class UmlParser {
             try {
                 CompilationUnit cu = JavaParser.parse(file);
                 ClassOrInterfaceDeclaration c = parseClassOrInterfaceDeclaration(cu);
-                classMap.put(c.getName(), c);
+                if (c != null) {
+                    classMap.put(c.getName(), c);
+                }
             } catch (ParseException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -64,7 +71,6 @@ public class UmlParser {
         }
 
         classDiagramSB.append("@startuml\n");
-        sequenceDiagramSB.append("@startuml\n");
         for (Map.Entry<String, ClassOrInterfaceDeclaration> entry : classMap.entrySet()) {
             printClassOrInterface(entry.getValue());
         }
@@ -73,9 +79,11 @@ public class UmlParser {
         classDiagramSB.append("@enduml\n");
         log(classDiagramSB.toString());
 //        draw(classDiagramSB.toString(), filename);
-        logln("\n\n\nSequence:");
 
-        printReturnMsg();
+        logln("\n\n\nSequence:");
+//        printReturnMsg();
+        sequenceDiagramSB.append("@startuml\n");
+        startSequence();
         sequenceDiagramSB.append("@enduml\n");
         log(sequenceDiagramSB.toString());
         draw(sequenceDiagramSB.toString(), "s.png");
@@ -95,6 +103,13 @@ public class UmlParser {
 
     public void printClassOrInterface(ClassOrInterfaceDeclaration cid) {
         this.currentCID = cid;
+
+        // sequence diagram
+        UmlSDActor actor = new UmlSDActor();
+        this.currentUmlSDActor = actor;
+        sdActorMap.put(cid.getName(), actor);
+        actor.classOrInterfaceDeclaration = cid;
+
         getterSetter = new HashSet<>();
 
         // 1. member and method
@@ -203,6 +218,12 @@ public class UmlParser {
                         if (classMap.containsKey(((ClassOrInterfaceType) subType).getName())) {
                             // B b,
                             createRelationship((ClassOrInterfaceType) subType, "1");
+
+                            // sequence diagram
+                            ClassOrInterfaceDeclaration relatedCID = classMap.get(((ClassOrInterfaceType) subType).getName());
+                            String variableName = null;
+                            variableName = fd.getVariables().get(0).getId().getName();
+                            this.currentUmlSDActor.attrs.put(variableName, relatedCID);
                         } else {
                             // String s
                             printPrimitiveType(fd);
@@ -224,6 +245,18 @@ public class UmlParser {
                 || getterSetter.contains(md.getName())) {
             return;
         }
+
+        // sequence
+        Map<String, ClassOrInterfaceDeclaration> variables = new HashMap<>();
+        this.currentUmlSDActor.methodVariables.put(md.getName(), variables);
+        this.currentUmlSDActor.methods.put(md.getName(), md);
+
+
+        if (isPSVM(md)) {
+            psvmMethodClass = this.currentCID.getName();
+        }
+
+        // TODO: delete it
         // class name -> variable names
         Map<String, List<VariableDeclaratorId>> variableMap = new HashMap<>();
 
@@ -236,6 +269,14 @@ public class UmlParser {
 
         BlockStmt body = md.getBody();
         printBody(variableMap, variableNameMap, body);
+
+        // sequence
+        // variableNameMap => variables
+        for (Map.Entry<String, String> entry : variableNameMap.entrySet()) {
+            if (classMap.containsKey(entry.getValue())) {
+                variables.put(entry.getKey(), classMap.get(entry.getValue()));
+            }
+        }
     }
 
     private void printConstructor(ConstructorDeclaration md) {
@@ -279,6 +320,7 @@ public class UmlParser {
                             ids.add(p.getId());
                             variableMap.put(depName, ids);
                             variableNameMap.put(p.getId().getName(), depName);
+
                         }
                     }
                 }
@@ -344,10 +386,10 @@ public class UmlParser {
                                             .append(": ")
                                             .append(methodName)
                                             .append("\n");
-                                    if (sequenceList.peekLast() != this.currentCID) {
-                                        sequenceList.offerLast(this.currentCID);
-                                    }
-                                    sequenceList.offerLast(classMap.get(className));
+//                                    if (sequenceList.peekLast() != this.currentCID) {
+//                                        sequenceList.offerLast(this.currentCID);
+//                                    }
+//                                    sequenceList.offerLast(classMap.get(className));
                                 }
                             }
                         }
@@ -359,19 +401,20 @@ public class UmlParser {
     }
 
     private void printReturnMsg() {
-        while (sequenceList.size() >= 2) {
-            ClassOrInterfaceDeclaration last = sequenceList.pollLast();
-            sequenceDiagramSB.append(last.getName())
-                    .append(" ")
-                    .append("-->")
-                    .append(" ")
-                    .append(sequenceList.peekLast().getName())
-                    .append("\n");
-        }
+//        while (sequenceList.size() >= 2) {
+//            ClassOrInterfaceDeclaration last = sequenceList.pollLast();
+//            sequenceDiagramSB.append(last.getName())
+//                    .append(" ")
+//                    .append("-->")
+//                    .append(" ")
+//                    .append(sequenceList.peekLast().getName())
+//                    .append("\n");
+//        }
     }
 
     private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
         ClassOrInterfaceDeclaration relatedCID = classMap.get(subType.getName());
+
         String relationKey = getASRelationKey(currentCID.getName(), relatedCID.getName());
         if (relationshipMap.containsKey(relationKey)) {
             UmlRelationship r = relationshipMap.get(relationKey);
@@ -519,6 +562,10 @@ public class UmlParser {
         return (mod & ModifierSet.PUBLIC) != 0;
     }
 
+    private boolean isStatic(int mod) {
+        return (mod & ModifierSet.STATIC) != 0;
+    }
+
     private boolean isPrivate(int mod) {
         return (mod & ModifierSet.PRIVATE) != 0;
     }
@@ -544,6 +591,101 @@ public class UmlParser {
                     png.close();
                 } catch (IOException e) {
                     e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isPSVM(MethodDeclaration md) {
+        boolean isPublic = isPublic(md.getModifiers());
+        boolean isStatic = isStatic(md.getModifiers());
+        boolean isVoid = md.getType().toString().equals("void");
+        boolean isMain = md.getName().toString().equals("main");
+
+        return isPublic && isStatic && isVoid && isMain;
+    }
+
+    private void startSequence() {
+        if (psvmMethodClass == null) {
+            return;
+        }
+        UmlSDActor actor = sdActorMap.get(psvmMethodClass);
+        printCall(actor, actor.methods.get("main"));
+
+    }
+
+    private void printCall(UmlSDActor actor, MethodDeclaration md) {
+        if (actor == null || md == null) {
+            return;
+        }
+        BlockStmt body = md.getBody();
+        do {
+            Map<String, ClassOrInterfaceDeclaration> methodVariables = actor.methodVariables.get(md.getName());
+            if (body == null) {
+                break;
+            }
+            List<Statement> expressionStmtList = body.getStmts();
+            if (expressionStmtList == null) {
+                break;
+            }
+            for (Statement stmt : expressionStmtList) {
+                MethodCallExpr methodCallExpr = findMethodCallExpr(stmt);
+
+                if (methodCallExpr != null) {
+                    Expression scopeExp = methodCallExpr.getScope();
+                    ClassOrInterfaceDeclaration classOrInterfaceDeclaration = null;
+                    String methodName = methodCallExpr.getName();
+                    if (scopeExp != null) {
+                        String scope = scopeExp.toString();
+                        if (actor.attrs.containsKey(scope)) {
+                            classOrInterfaceDeclaration = actor.attrs.get(scope);
+                        }
+                        if (methodVariables.containsKey(scope)) {
+                            classOrInterfaceDeclaration = methodVariables.get(scope);
+                        }
+                    } else {
+                        classOrInterfaceDeclaration = actor.classOrInterfaceDeclaration;
+                    }
+                    if (classOrInterfaceDeclaration != null) {
+
+                        sequenceDiagramSB.append(actor.classOrInterfaceDeclaration.getName())
+                                .append(" ")
+                                .append("->")
+                                .append(" ")
+                                .append(classOrInterfaceDeclaration.getName())
+                                .append(": ")
+                                .append(methodName)
+                                .append("\n");
+                        sequenceDiagramSB.append("activate " + classOrInterfaceDeclaration.getName() + "\n");
+                        UmlSDActor nextActor = sdActorMap.get(classOrInterfaceDeclaration.getName());
+                        printCall(nextActor, nextActor.methods.get(methodName));
+                        if (!actor.classOrInterfaceDeclaration.getName().equals(classOrInterfaceDeclaration.getName())) {
+                            sequenceDiagramSB.append(classOrInterfaceDeclaration.getName())
+                                    .append(" ")
+                                    .append("-->")
+                                    .append(" ")
+                                    .append(actor.classOrInterfaceDeclaration.getName())
+                                    .append("\n");
+                        }
+                        sequenceDiagramSB.append("deactivate " + classOrInterfaceDeclaration.getName() + "\n");
+                    }
+                }
+            }
+
+        } while (false);
+    }
+
+    private MethodCallExpr findMethodCallExpr(Node node) {
+        if (node instanceof MethodCallExpr) {
+            return (MethodCallExpr)node;
+        }
+        List<Node> nodes = node.getChildrenNodes();
+        if (nodes != null) {
+            for (Node n : nodes) {
+                MethodCallExpr ans = findMethodCallExpr(n);
+                if (ans != null) {
+                    return ans;
                 }
             }
         }

@@ -1,7 +1,7 @@
 
 public class ConcreteDecoratorB {
 
-    ConcreteDecoratorA component;
+    private ConcreteDecoratorA component;
     private String addedState;
 
     public ConcreteDecoratorB( ConcreteDecoratorA c)

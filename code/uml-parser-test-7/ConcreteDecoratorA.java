@@ -2,7 +2,7 @@
 public class ConcreteDecoratorA {
 
 	private String addedState;
-    ConcreteComponent component;
+    private ConcreteComponent component;
 
     public ConcreteDecoratorA( ConcreteComponent c)
     {
