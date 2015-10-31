@@ -3,16 +3,16 @@ import java.util.*;
 
 public class ConcreteSubject implements Subject {
  
-	private String state;
+	private String subjectState;
 	 
 	private Collection<Observer> observers = new ArrayList<Observer>() ;
 	 
 	public String getState() {
-		return state ;
+		return subjectState ;
 	}
 	 
 	public void setState(String status) {
-		state = status ;
+	    subjectState = status ;
         notifyObservers();
 	}
 

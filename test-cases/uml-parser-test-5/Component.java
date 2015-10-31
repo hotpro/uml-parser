@@ -1,6 +1,6 @@
 
 public interface Component {
 
-	String operation();
+	public String operation();
 
 }

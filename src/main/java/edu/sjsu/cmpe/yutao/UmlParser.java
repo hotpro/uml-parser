@@ -73,8 +73,8 @@ public class UmlParser {
         sequenceDiagramSB.append("@enduml\n");
         log(classDiagramSB.toString());
         draw(classDiagramSB.toString(), filename);
-        logln("\n\n\nSequence:");
-        log(sequenceDiagramSB.toString());
+//        logln("\n\n\nSequence:");
+//        log(sequenceDiagramSB.toString());
 //        draw(sequenceDiagramSB.toString(), "s.png");
 
     }
@@ -128,7 +128,7 @@ public class UmlParser {
             for (ClassOrInterfaceType classType : extendsList) {
                 String name = classType.getName();
                 if (classMap.containsKey(name)) {
-                    String relationKey = name + "_" + cid.getName();
+                    String relationKey = name + "_" + cid.getName() + "_EX";
                     relationshipMap.put(relationKey,
                             new UmlRelationship(classMap.get(name), "", cid, "", UmlRelationShipType.EX));
                 }
@@ -141,7 +141,7 @@ public class UmlParser {
             for (ClassOrInterfaceType interfaceType : implementList) {
                 String name = interfaceType.getName();
                 if (classMap.containsKey(name)) {
-                    String relationKey = name + "_" + cid.getName();
+                    String relationKey = name + "_" + cid.getName() + "_IM";
                     relationshipMap.put(relationKey,
                             new UmlRelationship(classMap.get(name), "", cid, "", UmlRelationShipType.IM));
                 }
@@ -287,11 +287,14 @@ public class UmlParser {
 
     private void printDependency(String depName) {
         ClassOrInterfaceDeclaration depCID = this.classMap.get(depName);
-        String relationKey = getASRelationKey(depName, currentCID.getName());
+        String relationKey = getASRelationKey(depName, currentCID.getName()) + "_dep";
         // if they have stronger relationship, ignore dependency
-        if (!relationshipMap.containsKey(relationKey) && depCID.isInterface()) {
-            relationshipMap.put(relationKey,
-                    new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
+//        if (!relationshipMap.containsKey(relationKey) && depCID.isInterface()) {
+
+        // if depend on interface
+        if (depCID.isInterface()) {
+                relationshipMap.put(relationKey,
+                        new UmlRelationship(depCID, "", this.currentCID, "", UmlRelationShipType.DEP));
         }
     }
 
@@ -354,7 +357,7 @@ public class UmlParser {
 
     private void createRelationship(ClassOrInterfaceType subType, String multiplicity) {
         ClassOrInterfaceDeclaration relatedCID = classMap.get(subType.getName());
-        String relationKey = getASRelationKey(currentCID.getName(), relatedCID.getName());
+        String relationKey = getASRelationKey(currentCID.getName(), relatedCID.getName()) + "_AS";
         if (relationshipMap.containsKey(relationKey)) {
             UmlRelationship r = relationshipMap.get(relationKey);
             r.setMultiplicityA(multiplicity);
