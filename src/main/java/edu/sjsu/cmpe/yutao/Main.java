@@ -6,9 +6,8 @@ package edu.sjsu.cmpe.yutao;
 public class Main {
     public static void main(String[] args) {
         args = new String[2];
-        int suffix = 9;
-        args[0] = "code/uml-parser-test-" + suffix;
-        args[1] = "output" + suffix + ".png";
+        args[0] = "test-cases/uml-parser-sequence-diagram";
+        args[1] = "output.png";
         if (args == null || args.length < 2) {
             System.out.println("Please input umlparser <classpath> <output file name>");
         }

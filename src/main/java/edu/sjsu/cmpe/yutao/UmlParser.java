@@ -77,7 +77,7 @@ public class UmlParser {
         printRelationShip();
         classDiagramSB.append(relationSB.toString());
         classDiagramSB.append("@enduml\n");
-        log(classDiagramSB.toString());
+//        log(classDiagramSB.toString());
 //        draw(classDiagramSB.toString(), filename);
 
         logln("\n\n\nSequence:");
@@ -86,7 +86,7 @@ public class UmlParser {
         startSequence();
         sequenceDiagramSB.append("@enduml\n");
         log(sequenceDiagramSB.toString());
-        draw(sequenceDiagramSB.toString(), "s.png");
+        draw(sequenceDiagramSB.toString(), "sequence_diagram.png");
     }
 
     private ClassOrInterfaceDeclaration parseClassOrInterfaceDeclaration(CompilationUnit cu) {
