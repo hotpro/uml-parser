@@ -657,9 +657,19 @@ public class UmlParser {
                                 .append(": ")
                                 .append(methodName)
                                 .append("\n");
-                        sequenceDiagramSB.append("activate " + classOrInterfaceDeclaration.getName() + "\n");
+                        sequenceDiagramSB.append("activate " + classOrInterfaceDeclaration.getName());
+
+                        // if internal call, darksalmon color, otherwise FFBBBBB
+                        if (actor.classOrInterfaceDeclaration.getName().equals(classOrInterfaceDeclaration.getName())) {
+                            sequenceDiagramSB.append(" #DarkSalmon");
+                        } else {
+                            sequenceDiagramSB.append(" #FFBBBB");
+                        }
+                        sequenceDiagramSB.append("\n");
                         UmlSDActor nextActor = sdActorMap.get(classOrInterfaceDeclaration.getName());
                         printCall(nextActor, nextActor.methods.get(methodName));
+
+                        // if not internal call, print return message
                         if (!actor.classOrInterfaceDeclaration.getName().equals(classOrInterfaceDeclaration.getName())) {
                             sequenceDiagramSB.append(classOrInterfaceDeclaration.getName())
                                     .append(" ")

@@ -12,6 +12,6 @@ import java.util.Map;
 public class UmlSDActor {
     ClassOrInterfaceDeclaration classOrInterfaceDeclaration;
     Map<String, ClassOrInterfaceDeclaration> attrs = new HashMap<>();
-    Map<String, Map<String, ClassOrInterfaceDeclaration>> methodVariables = new HashMap<>();
     Map<String, MethodDeclaration> methods = new HashMap<>();
+    Map<String, Map<String, ClassOrInterfaceDeclaration>> methodVariables = new HashMap<>();
 }
